@@ -304,22 +304,11 @@ namespace NLog.Targets
         protected virtual IWcfLogReceiverClient CreateLogReceiver(string endPointAddress)
         {
             WcfLogReceiverClient client;
-            var isSslEndpoint = IsSslEndpoint(endPointAddress);
 
             if (string.IsNullOrEmpty(EndpointConfigurationName))
             {
                 // endpoint not specified - use BasicHttpBinding
-                Binding binding;
-
-                if (UseBinaryEncoding)
-                {
-                    binding = new CustomBinding(new BinaryMessageEncodingBindingElement(), isSslEndpoint ? new HttpsTransportBindingElement() : new HttpTransportBindingElement());
-                }
-                else
-                {
-                    binding = CreateBasicHttpBinding(isSslEndpoint);
-                }
-
+                Binding binding = CreateBinding(endPointAddress);
                 client = new WcfLogReceiverClient(UseOneWayContract, binding, new EndpointAddress(endPointAddress));
             }
             else
@@ -332,24 +321,28 @@ namespace NLog.Targets
             return client;
         }
 
-        private static BasicHttpBinding CreateBasicHttpBinding(bool isSslEndpoint)
+        private Binding CreateBinding(string endPointAddress)
         {
-            var binding = new BasicHttpBinding();
+            var isSslEndpoint = endPointAddress.StartsWith("https", StringComparison.InvariantCultureIgnoreCase);
 
-            binding.Security.Transport.ClientCredentialType = HttpClientCredentialType.Windows;
-            binding.Security.Mode = isSslEndpoint
-                ? BasicHttpSecurityMode.Transport
-                : BasicHttpSecurityMode.TransportCredentialOnly;
+            if (UseBinaryEncoding)
+            {
+                return new CustomBinding(new BinaryMessageEncodingBindingElement(), isSslEndpoint ? new HttpsTransportBindingElement() : new HttpTransportBindingElement());
+            }
+            else
+            {
+                var binding = new BasicHttpBinding();
 
-            return binding;
+                binding.Security.Transport.ClientCredentialType = HttpClientCredentialType.Windows;
+                binding.Security.Mode = isSslEndpoint
+                    ? BasicHttpSecurityMode.Transport
+                    : BasicHttpSecurityMode.TransportCredentialOnly;
+
+                return binding;
+            }
         }
 
-        private static bool IsSslEndpoint(string url)
-        {
-            return url.StartsWith("https", StringComparison.InvariantCultureIgnoreCase);
-        }
-
-        private void ClientOnProcessLogMessagesCompleted(object sender, AsyncCompletedEventArgs asyncCompletedEventArgs)
+        private static void ClientOnProcessLogMessagesCompleted(object sender, AsyncCompletedEventArgs asyncCompletedEventArgs)
         {
             var client = sender as IWcfLogReceiverClient;
             if (client != null && client.State == CommunicationState.Opened)
