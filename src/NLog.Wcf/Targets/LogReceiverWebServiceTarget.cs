@@ -304,6 +304,7 @@ namespace NLog.Targets
         protected virtual IWcfLogReceiverClient CreateLogReceiver(string endPointAddress)
         {
             WcfLogReceiverClient client;
+            var isSslEndpoint = IsSslEndpoint(endPointAddress);
 
             if (string.IsNullOrEmpty(EndpointConfigurationName))
             {
@@ -312,11 +313,11 @@ namespace NLog.Targets
 
                 if (UseBinaryEncoding)
                 {
-                    binding = new CustomBinding(new BinaryMessageEncodingBindingElement(), new HttpTransportBindingElement());
+                    binding = new CustomBinding(new BinaryMessageEncodingBindingElement(), isSslEndpoint ? new HttpsTransportBindingElement() : new HttpTransportBindingElement());
                 }
                 else
                 {
-                    binding = new BasicHttpBinding();
+                    binding = CreateBasicHttpBinding(isSslEndpoint);
                 }
 
                 client = new WcfLogReceiverClient(UseOneWayContract, binding, new EndpointAddress(endPointAddress));
@@ -329,6 +330,23 @@ namespace NLog.Targets
             client.ProcessLogMessagesCompleted += ClientOnProcessLogMessagesCompleted;
 
             return client;
+        }
+
+        private static BasicHttpBinding CreateBasicHttpBinding(bool isSslEndpoint)
+        {
+            var binding = new BasicHttpBinding();
+
+            binding.Security.Transport.ClientCredentialType = HttpClientCredentialType.Windows;
+            binding.Security.Mode = isSslEndpoint
+                ? BasicHttpSecurityMode.Transport
+                : BasicHttpSecurityMode.TransportCredentialOnly;
+
+            return binding;
+        }
+
+        private static bool IsSslEndpoint(string url)
+        {
+            return url.StartsWith("https", StringComparison.InvariantCultureIgnoreCase);
         }
 
         private void ClientOnProcessLogMessagesCompleted(object sender, AsyncCompletedEventArgs asyncCompletedEventArgs)
