@@ -271,6 +271,8 @@ namespace NLog.Targets
             }
 
             var endPointAddress = RenderLogEvent(EndpointAddress, asyncContinuations[0].LogEvent);
+            if (string.IsNullOrEmpty(endPointAddress))
+                throw new NLogRuntimeException("LogReceiverWebServiceTarget EndpointAddress-property must be assigned. EndpointAddress is needed for WCF Client.");
 
             var client = CreateLogReceiver(endPointAddress);
             client.ProcessLogMessagesCompleted += (sender, e) =>
