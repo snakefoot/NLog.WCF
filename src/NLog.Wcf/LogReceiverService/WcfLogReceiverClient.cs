@@ -478,9 +478,21 @@ namespace NLog.LogReceiverService
         public void Dispose()
         {
             if (ProxiedClient is IDisposable diposable)
+            {
                 diposable.Dispose();
+            }
             else
-                CloseCommunicationObject();
+            {
+                try
+                {
+                    if (ProxiedClient.State == CommunicationState.Opened)
+                        ProxiedClient.Close();
+                }
+                catch
+                {
+                    ProxiedClient.Abort();
+                }
+            }
         }
     }
 }

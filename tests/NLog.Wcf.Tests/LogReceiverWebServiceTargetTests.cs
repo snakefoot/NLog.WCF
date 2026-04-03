@@ -35,8 +35,11 @@ namespace NLog.Wcf.Tests
 {
     using System;
     using System.Collections.Generic;
+    using System.ComponentModel;
+    using System.Net;
     using System.ServiceModel;
     using System.ServiceModel.Channels;
+    using System.ServiceModel.Description;
     using System.Threading;
     using NLog.Common;
     using NLog.LogReceiverService;
@@ -116,9 +119,43 @@ namespace NLog.Wcf.Tests
         }
 
         [Fact]
+        public void LogReceiverWebServiceTargetSendSingleEventTest()
+        {
+            var target = new MockLogReceiverWebServiceTarget();
+            target.EndpointAddress = "http://notimportant:9999/";
+            target.Parameters.Add(new MethodCallParameter("message", "${message}"));
+            target.Parameters.Add(new MethodCallParameter("lvl", "${level}"));
+
+            var logFactory = new LogFactory().Setup().LoadConfiguration(cfg =>
+            {
+                cfg.ForLogger().WriteTo(target);
+            }).LogFactory;
+
+            var logger = logFactory.GetLogger("loggerName");
+            logger.Info("message text");
+            logFactory.Flush();
+
+            var payload = target.LastPayload;
+            Assert.NotNull(payload);
+            Assert.Equal(2, payload.LayoutNames.Count);
+            Assert.Equal("message", payload.LayoutNames[0]);
+            Assert.Equal("lvl", payload.LayoutNames[1]);
+            Assert.Equal(3, payload.Strings.Count);
+            Assert.Single(payload.Events);
+            Assert.Equal("message text", payload.Strings[payload.Events[0].ValueIndexes[0]]);
+            Assert.Equal("Info", payload.Strings[payload.Events[0].ValueIndexes[1]]);
+            Assert.Equal("loggerName", payload.Strings[payload.Events[0].LoggerOrdinal]);
+            Assert.NotNull(target.LastReceiverClient);
+            Assert.False(target.LastReceiverClient.OpenSignaled);   // Mock never opens
+            Assert.False(target.LastReceiverClient.CloseSignaled);  // Only close when opened
+            Assert.False(target.LastReceiverClient.AbortSignaled);  // Only abort when close fails
+            Assert.True(target.LastReceiverClient.DisposeSignaled); // EventHandlers disconnected from target
+        }
+
+        [Fact]
         public void LogReceiverWebServiceTargetSingleEventTest()
         {
-            var target = new MyLogReceiverWebServiceTarget();
+            var target = new NoSendLogReceiverWebServiceTarget();
             target.EndpointAddress = "http://notimportant:9999/";
             target.Parameters.Add(new MethodCallParameter("message", "${message}"));
             target.Parameters.Add(new MethodCallParameter("lvl", "${level}"));
@@ -144,7 +181,7 @@ namespace NLog.Wcf.Tests
         [Fact]
         public void LogReceiverWebServiceTargetMultipleEventTest()
         {
-            var target = new MyLogReceiverWebServiceTarget();
+            var target = new NoSendLogReceiverWebServiceTarget();
             target.EndpointAddress = "http://notimportant:9999/";
             target.Parameters.Add(new MethodCallParameter("message", "${message}"));
             target.Parameters.Add(new MethodCallParameter("lvl", "${level}"));
@@ -193,7 +230,7 @@ namespace NLog.Wcf.Tests
         [Fact]
         public void LogReceiverWebServiceTargetMultipleEventWithPerEventPropertiesTest()
         {
-            var target = new MyLogReceiverWebServiceTarget();
+            var target = new NoSendLogReceiverWebServiceTarget();
             target.IncludeEventProperties = true;
             target.EndpointAddress = "http://notimportant:9999/";
             target.Parameters.Add(new MethodCallParameter("message", "${message}"));
@@ -259,7 +296,7 @@ namespace NLog.Wcf.Tests
         [Fact]
         public void NoEmptyEventLists()
         {
-            var target = new MyLogReceiverWebServiceTarget();
+            var target = new NoSendLogReceiverWebServiceTarget();
             target.EndpointAddress = "http://notimportant:9999/";
 
             var logger = new LogFactory().Setup().LoadConfiguration(cfg =>
@@ -291,18 +328,18 @@ namespace NLog.Wcf.Tests
             }
         }
 
-        public class MyLogReceiverWebServiceTarget : LogReceiverWebServiceTarget
+        public sealed class NoSendLogReceiverWebServiceTarget : LogReceiverWebServiceTarget
         {
             public NLogEvents LastPayload;
             public int SendCount;
 
             public ManualResetEventSlim SendCompleted = new ManualResetEventSlim(false);
 
-            public MyLogReceiverWebServiceTarget() : base()
+            public NoSendLogReceiverWebServiceTarget() : base()
             {
             }
 
-            public MyLogReceiverWebServiceTarget(string name) : base(name)
+            public NoSendLogReceiverWebServiceTarget(string name) : base(name)
             {
             }
 
@@ -317,7 +354,252 @@ namespace NLog.Wcf.Tests
                 }
 
                 SendCompleted.Set();
-                return false;
+                return false;   // Never send
+            }
+        }
+
+        public sealed class MockLogReceiverWebServiceTarget : LogReceiverWebServiceTarget
+        {
+
+            public NLogEvents LastPayload;
+            public MockWcfLogReceiverClient LastReceiverClient;
+
+            protected override IWcfLogReceiverClient CreateLogReceiver(string endPointAddress)
+            {
+                var client = new MockWcfLogReceiverClient(this);
+                client.ProcessLogMessagesCompleted += ClientOnProcessLogMessagesCompleted;
+                LastReceiverClient = client;
+                return client;
+            }
+
+            private static void ClientOnProcessLogMessagesCompleted(object sender, AsyncCompletedEventArgs asyncCompletedEventArgs)
+            {
+                if (sender is IDisposable disposable)
+                {
+                    // Attempt to "disconnect" the client-event-handlers to avoid "leak"
+                    disposable.Dispose();
+                }
+                else if (sender is IWcfLogReceiverClient client)
+                {
+                    if (client.State == CommunicationState.Opened)
+                    {
+                        try
+                        {
+                            client.Close();
+                        }
+                        catch
+                        {
+                            client.Abort();
+                        }
+                    }
+                }
+            }
+
+            public sealed class MockWcfLogReceiverClient : IWcfLogReceiverClient, IDisposable
+            {
+                private readonly MockLogReceiverWebServiceTarget _target;
+
+                public MockWcfLogReceiverClient(MockLogReceiverWebServiceTarget target)
+                {
+                    _target = target;
+                }
+
+                public bool OpenSignaled { get; private set; }
+                public bool CloseSignaled { get; private set; }
+                public bool AbortSignaled { get; private set; }
+                public bool DisposeSignaled { get; private set; }
+
+
+                public EventHandler<AsyncCompletedEventArgs> ProcessLogMessagesCompleted;
+
+                public EventHandler<AsyncCompletedEventArgs> OpenCompleted;
+
+                public EventHandler<AsyncCompletedEventArgs> CloseCompleted;
+
+                public event EventHandler Closed;
+
+                public event EventHandler Closing;
+
+                public event EventHandler Faulted;
+
+                public event EventHandler Opened;
+
+                public event EventHandler Opening;
+
+                ClientCredentials IWcfLogReceiverClient.ClientCredentials => null;
+                IClientChannel IWcfLogReceiverClient.InnerChannel => null;
+
+                ServiceEndpoint IWcfLogReceiverClient.Endpoint => null;
+
+#if NETFRAMEWORK
+                CookieContainer IWcfLogReceiverClient.CookieContainer { get => null; set => throw new NotImplementedException(); }
+#endif
+                CommunicationState ICommunicationObject.State => OpenSignaled && !CloseSignaled && !AbortSignaled ? CommunicationState.Opened : CommunicationState.Closed;
+
+                event EventHandler<AsyncCompletedEventArgs> IWcfLogReceiverClient.ProcessLogMessagesCompleted
+                {
+                    add
+                    {
+                        ProcessLogMessagesCompleted += value;
+                    }
+
+                    remove
+                    {
+                        ProcessLogMessagesCompleted -= value;
+                    }
+                }
+
+                event EventHandler<AsyncCompletedEventArgs> IWcfLogReceiverClient.OpenCompleted
+                {
+                    add
+                    {
+                        OpenCompleted += value;
+                    }
+
+                    remove
+                    {
+                        OpenCompleted -= value;
+                    }
+                }
+
+                event EventHandler<AsyncCompletedEventArgs> IWcfLogReceiverClient.CloseCompleted
+                {
+                    add
+                    {
+                        CloseCompleted += value;
+                    }
+
+                    remove
+                    {
+                        CloseCompleted -= value;
+                    }
+                }
+
+                void ICommunicationObject.Abort() => AbortSignaled = true;
+
+                IAsyncResult ICommunicationObject.BeginClose(AsyncCallback callback, object state)
+                {
+                    throw new NotImplementedException();
+                }
+
+                IAsyncResult ICommunicationObject.BeginClose(TimeSpan timeout, AsyncCallback callback, object state)
+                {
+                    throw new NotImplementedException();
+                }
+
+                IAsyncResult ICommunicationObject.BeginOpen(AsyncCallback callback, object state)
+                {
+                    throw new NotImplementedException();
+                }
+
+                IAsyncResult ICommunicationObject.BeginOpen(TimeSpan timeout, AsyncCallback callback, object state)
+                {
+                    throw new NotImplementedException();
+                }
+
+                IAsyncResult IWcfLogReceiverClient.BeginProcessLogMessages(NLogEvents events, AsyncCallback callback, object asyncState)
+                {
+                    throw new NotImplementedException();
+                }
+
+                public void Fault()
+                {
+                    Faulted?.Invoke(this, EventArgs.Empty);
+                }
+
+                public void Close()
+                {
+                    Closing?.Invoke(this, EventArgs.Empty);
+                    CloseSignaled = true;
+                    Closed?.Invoke(this, EventArgs.Empty);
+                }
+
+                void ICommunicationObject.Close(TimeSpan timeout)
+                {
+                    Close();
+                }
+
+                void IWcfLogReceiverClient.CloseAsync()
+                {
+                    Close();
+                }
+
+                void IWcfLogReceiverClient.CloseAsync(object userState)
+                {
+                    Close();
+                }
+
+#if NETFRAMEWORK
+                void IWcfLogReceiverClient.DisplayInitializationUI()
+                {
+                }
+#endif
+
+                void ICommunicationObject.EndClose(IAsyncResult result)
+                {
+                    CloseSignaled = true;
+                }
+
+                void ICommunicationObject.EndOpen(IAsyncResult result)
+                {
+                    OpenSignaled = true;
+                }
+
+                void IWcfLogReceiverClient.EndProcessLogMessages(IAsyncResult result)
+                {
+                }
+
+                public void Open()
+                {
+                    Opening?.Invoke(this, EventArgs.Empty);
+                    OpenSignaled = true;
+                    Opened?.Invoke(this, EventArgs.Empty);
+                }
+
+                void ICommunicationObject.Open(TimeSpan timeout)
+                {
+                    Open();
+                }
+
+                void IWcfLogReceiverClient.OpenAsync()
+                {
+                    Open();
+                }
+
+                void IWcfLogReceiverClient.OpenAsync(object userState)
+                {
+                    Open();
+                }
+
+                void IWcfLogReceiverClient.ProcessLogMessagesAsync(NLogEvents events)
+                {
+                    _target.LastPayload = events;
+                    ThreadPool.QueueUserWorkItem(s => ProcessLogMessagesCompleted?.Invoke(this, new AsyncCompletedEventArgs(null, false, null)));
+                }
+
+                void IWcfLogReceiverClient.ProcessLogMessagesAsync(NLogEvents events, object userState)
+                {
+                    _target.LastPayload = events;
+                    ThreadPool.QueueUserWorkItem(s => ProcessLogMessagesCompleted?.Invoke(this, new AsyncCompletedEventArgs(null, false, userState)));
+                }
+
+                public void Dispose()
+                {
+                    if (OpenSignaled)
+                    {
+                        CloseSignaled = true;
+                    }
+                    // Disconnect from target to avoid "leak"
+                    ProcessLogMessagesCompleted = null;
+                    OpenCompleted = null;
+                    CloseCompleted = null;
+                    Closed = null;
+                    Closing = null;
+                    Faulted = null;
+                    Opened = null;
+                    Opening = null;
+                    DisposeSignaled = true;
+                }
             }
         }
     }

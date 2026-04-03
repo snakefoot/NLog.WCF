@@ -350,16 +350,23 @@ namespace NLog.Targets
 
         private static void ClientOnProcessLogMessagesCompleted(object sender, AsyncCompletedEventArgs asyncCompletedEventArgs)
         {
-            var client = sender as IWcfLogReceiverClient;
-            if (client != null && client.State == CommunicationState.Opened)
+            if (sender is IDisposable disposable)
             {
-                try
+                // Attempt to "disconnect" the client-event-handlers to avoid "leak"
+                disposable.Dispose();
+            }
+            else if (sender is IWcfLogReceiverClient client)
+            {
+                if (client.State == CommunicationState.Opened)
                 {
-                    client.Close();
-                }
-                catch
-                {
-                    client.Abort();
+                    try
+                    {
+                        client.Close();
+                    }
+                    catch
+                    {
+                        client.Abort();
+                    }
                 }
             }
         }

@@ -203,10 +203,21 @@ namespace NLog.LogReceiverService
         {
             if (disposing)
             {
-                ProcessLogMessagesCompleted = null;
-                OpenCompleted = null;
-                CloseCompleted = null;
-                Close();
+                try
+                {
+                    if (State == CommunicationState.Opened)
+                        Close();
+                }
+                catch
+                {
+                    Abort();
+                }
+                finally
+                {
+                    ProcessLogMessagesCompleted = null;
+                    OpenCompleted = null;
+                    CloseCompleted = null;
+                }
             }
         }
 
@@ -265,11 +276,12 @@ namespace NLog.LogReceiverService
 
         private void OnProcessLogMessagesCompleted(object state)
         {
-            if (ProcessLogMessagesCompleted != null)
+            var processLogMessagesCompleted = ProcessLogMessagesCompleted;
+            if (processLogMessagesCompleted != null)
             {
                 var e = (InvokeAsyncCompletedEventArgs)state;
 
-                ProcessLogMessagesCompleted(this, new AsyncCompletedEventArgs(e.Error, e.Cancelled, e.UserState));
+                processLogMessagesCompleted(this, new AsyncCompletedEventArgs(e.Error, e.Cancelled, e.UserState));
             }
         }
 
@@ -286,11 +298,12 @@ namespace NLog.LogReceiverService
 
         private void OnOpenCompleted(object state)
         {
-            if (OpenCompleted != null)
+            var openCompleted = OpenCompleted;
+            if (openCompleted != null)
             {
                 var e = (InvokeAsyncCompletedEventArgs)state;
 
-                OpenCompleted(this, new AsyncCompletedEventArgs(e.Error, e.Cancelled, e.UserState));
+                openCompleted(this, new AsyncCompletedEventArgs(e.Error, e.Cancelled, e.UserState));
             }
         }
 
@@ -307,11 +320,12 @@ namespace NLog.LogReceiverService
 
         private void OnCloseCompleted(object state)
         {
-            if (CloseCompleted != null)
+            var closeCompleted = CloseCompleted;
+            if (closeCompleted != null)
             {
                 var e = (InvokeAsyncCompletedEventArgs)state;
 
-                CloseCompleted(this, new AsyncCompletedEventArgs(e.Error, e.Cancelled, e.UserState));
+                closeCompleted(this, new AsyncCompletedEventArgs(e.Error, e.Cancelled, e.UserState));
             }
         }
     }
