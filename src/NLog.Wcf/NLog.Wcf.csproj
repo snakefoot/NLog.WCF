@@ -4,7 +4,7 @@
     <TargetFrameworks>net35;net46;netstandard2.0</TargetFrameworks>
     <RootNamespace>NLog</RootNamespace>
 
-    <VersionPrefix>6.1.1</VersionPrefix>
+    <VersionPrefix>6.1.2</VersionPrefix>
     <VersionSuffix></VersionSuffix>
 
     <AssemblyVersion>6.0.0.0</AssemblyVersion>
@@ -23,6 +23,7 @@
     <PackageReleaseNotes>
 ChangeLog:
 
+- LogReceiverWebServiceTarget - Dispose IWcfLogReceiverClient instead of Close
 - Updated to System.ServiceModel ver. 8.1.1 and fixed breaking changes
 - Updated to NLog v6.1.1
 
