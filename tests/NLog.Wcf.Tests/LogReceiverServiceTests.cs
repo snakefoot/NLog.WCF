@@ -225,7 +225,7 @@ namespace NLog.Wcf.Tests
             Assert.Equal(xml1, xml2);
         }
 
-#if !NETSTANDARD
+#if NETFRAMEWORK
 #if MONO
         [Fact(Skip="Not working under MONO - not sure if unit test is wrong, or the code")]
 #else
@@ -385,6 +385,6 @@ namespace NLog.Wcf.Tests
                 CountdownEvent.Signal();
             }
         }
-#endif // !NETSTANDARD
+#endif // NETFRAMEWORK
     }
 }

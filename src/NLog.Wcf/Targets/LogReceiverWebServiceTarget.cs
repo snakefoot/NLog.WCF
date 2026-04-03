@@ -79,12 +79,14 @@ namespace NLog.Targets
         /// <docgen category='Connection Options' order='10' />
         public virtual Layout EndpointAddress { get; set; } = Layout.Empty;
 
+#if NETFRAMEWORK
         /// <summary>
         /// Gets or sets the name of the endpoint configuration in WCF configuration file.
         /// </summary>
         /// <value>The name of the endpoint configuration.</value>
         /// <docgen category='Connection Options' order='10' />
         public string EndpointConfigurationName { get; set; } = string.Empty;
+#endif
 
         /// <summary>
         /// Gets or sets a value indicating whether to use binary message encoding.
@@ -307,15 +309,17 @@ namespace NLog.Targets
         {
             WcfLogReceiverClient client;
 
-            if (string.IsNullOrEmpty(EndpointConfigurationName))
+#if NETFRAMEWORK
+            if (!string.IsNullOrEmpty(EndpointConfigurationName))
+            {
+                client = new WcfLogReceiverClient(UseOneWayContract, EndpointConfigurationName, new EndpointAddress(endPointAddress));
+            }
+            else
+#endif
             {
                 // endpoint not specified - use BasicHttpBinding
                 Binding binding = CreateBinding(endPointAddress);
                 client = new WcfLogReceiverClient(UseOneWayContract, binding, new EndpointAddress(endPointAddress));
-            }
-            else
-            {
-                client = new WcfLogReceiverClient(UseOneWayContract, EndpointConfigurationName, new EndpointAddress(endPointAddress));
             }
 
             client.ProcessLogMessagesCompleted += ClientOnProcessLogMessagesCompleted;

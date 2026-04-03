@@ -74,8 +74,8 @@ https://github.com/NLog/NLog/wiki/LogReceiverService-target
   </ItemGroup>
 
   <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard2.0' ">
-    <PackageReference Include="System.ServiceModel.Http" Version="4.5.3" />
-    <PackageReference Include="System.ServiceModel.NetTcp" Version="4.5.3" />
+    <PackageReference Include="System.ServiceModel.Http" Version="8.1.0" />
+    <PackageReference Include="System.ServiceModel.NetTcp" Version="8.1.0" />
   </ItemGroup>
 
   <PropertyGroup>

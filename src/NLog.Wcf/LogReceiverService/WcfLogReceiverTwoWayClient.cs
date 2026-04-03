@@ -49,6 +49,7 @@ namespace NLog.LogReceiverService
         {
         }
 
+#if NETFRAMEWORK
         /// <summary>
         /// Initializes a new instance of the <see cref="WcfLogReceiverTwoWayClient"/> class.
         /// </summary>
@@ -77,6 +78,18 @@ namespace NLog.LogReceiverService
             base(endpointConfigurationName, remoteAddress)
         {
         }
+#endif
+
+#if !NET35
+        /// <summary>
+        /// Initializes a new instance of the <see cref="WcfLogReceiverTwoWayClient"/> class.
+        /// </summary>
+        /// <param name="endpoint">The endpoint for a service that allows clients to find and communicate with the service.</param>
+        public WcfLogReceiverTwoWayClient(System.ServiceModel.Description.ServiceEndpoint endpoint)
+            : base(endpoint)
+        {
+        }
+#endif
 
         /// <summary>
         /// Initializes a new instance of the <see cref="WcfLogReceiverTwoWayClient"/> class.

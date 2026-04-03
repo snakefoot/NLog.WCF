@@ -45,7 +45,7 @@ namespace NLog.LogReceiverService
     /// to the inheriting class.
     /// </summary>
     /// <typeparam name="TService">Type of the WCF service.</typeparam>
-    public abstract class WcfLogReceiverClientBase<TService> : ClientBase<TService>, IWcfLogReceiverClient
+    public abstract class WcfLogReceiverClientBase<TService> : ClientBase<TService>, IWcfLogReceiverClient, IDisposable
         where TService : class
     {
         /// <summary>
@@ -56,6 +56,7 @@ namespace NLog.LogReceiverService
         {
         }
 
+#if NETFRAMEWORK
         /// <summary>
         /// Initializes a new instance of the <see cref="WcfLogReceiverClientBase{TService}"/> class.
         /// </summary>
@@ -84,6 +85,7 @@ namespace NLog.LogReceiverService
             : base(endpointConfigurationName, remoteAddress)
         {
         }
+#endif
 
         /// <summary>
         /// Initializes a new instance of the <see cref="WcfLogReceiverClientBase{TService}"/> class.
@@ -94,6 +96,17 @@ namespace NLog.LogReceiverService
             : base(binding, remoteAddress)
         {
         }
+
+#if !NET35
+        /// <summary>
+        /// Initializes a new instance of the <see cref="WcfLogReceiverClientBase{TService}"/> class.
+        /// </summary>
+        /// <param name="endpoint">The endpoint for a service that allows clients to find and communicate with the service.</param>
+        protected WcfLogReceiverClientBase(System.ServiceModel.Description.ServiceEndpoint endpoint)
+            : base(endpoint)
+        {
+        }
+#endif
 
         /// <summary>
         /// Occurs when the log message processing has completed.
@@ -110,7 +123,7 @@ namespace NLog.LogReceiverService
         /// </summary>
         public event EventHandler<AsyncCompletedEventArgs>? CloseCompleted;
 
-#if !NET35 && !NET40 && !NETSTANDARD
+#if NETFRAMEWORK && !NET35
 
         /// <summary>
         /// Gets or sets the cookie container.
@@ -171,6 +184,30 @@ namespace NLog.LogReceiverService
         public void CloseAsync(object? userState)
         {
             InvokeAsync(OnBeginClose, null, OnEndClose, OnCloseCompleted, userState);
+        }
+
+        /// <summary>
+        /// Implement IDisposable pattern
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Implement IDisposable pattern
+        /// </summary>
+        /// <param name="disposing">Disposing managed resources</param>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                ProcessLogMessagesCompleted = null;
+                OpenCompleted = null;
+                CloseCompleted = null;
+                Close();
+            }
         }
 
         /// <summary>

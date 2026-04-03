@@ -51,7 +51,7 @@ namespace NLog.LogReceiverService
     /// 3. change ProxiedClient back to public property.
     ///
     /// </remarks>
-    public sealed class WcfLogReceiverClient : IWcfLogReceiverClient
+    public sealed class WcfLogReceiverClient : IWcfLogReceiverClient, IDisposable
     {
         /// <summary>
         /// The client getting proxied
@@ -73,6 +73,7 @@ namespace NLog.LogReceiverService
             ProxiedClient = useOneWay ? (IWcfLogReceiverClient)new WcfLogReceiverOneWayClient() : new WcfLogReceiverTwoWayClient();
         }
 
+#if NETFRAMEWORK
         /// <summary>
         /// Initializes a new instance of the <see cref="WcfLogReceiverClient"/> class.
         /// </summary>
@@ -107,6 +108,20 @@ namespace NLog.LogReceiverService
             UseOneWay = useOneWay;
             ProxiedClient = useOneWay ? (IWcfLogReceiverClient)new WcfLogReceiverOneWayClient(endpointConfigurationName, remoteAddress) : new WcfLogReceiverTwoWayClient(endpointConfigurationName, remoteAddress);
         }
+#endif
+
+#if !NET35
+        /// <summary>
+        /// Initializes a new instance of the <see cref="WcfLogReceiverClient"/> class.
+        /// </summary>
+        /// <param name="useOneWay">Whether to use the one way or two way WCF client.</param>
+        /// <param name="endpoint">The endpoint for a service that allows clients to find and communicate with the service.</param>
+        public WcfLogReceiverClient(bool useOneWay, System.ServiceModel.Description.ServiceEndpoint endpoint)
+        {
+            UseOneWay = useOneWay;
+            ProxiedClient = useOneWay ? (IWcfLogReceiverClient)new WcfLogReceiverOneWayClient(endpoint) : new WcfLogReceiverTwoWayClient(endpoint);
+        }
+#endif
 
         /// <summary>
         /// Initializes a new instance of the <see cref="WcfLogReceiverClient"/> class.
@@ -274,7 +289,7 @@ namespace NLog.LogReceiverService
             remove => ProxiedClient.Closing -= value;
         }
 
-#if !NETSTANDARD
+#if NETFRAMEWORK
         /// <summary>
         /// Instructs the inner channel to display a user interface if one is required to initialize the channel prior to using it.
         /// </summary>
@@ -284,7 +299,7 @@ namespace NLog.LogReceiverService
         }
 #endif
 
-#if !NET35 && !NET40 && !NETSTANDARD
+ #if NETFRAMEWORK && !NET35
         /// <summary>
         /// Gets or sets the cookie container.
         /// </summary>
@@ -455,6 +470,17 @@ namespace NLog.LogReceiverService
         public void CloseCommunicationObject()
         {
             ProxiedClient.Close();
+        }
+
+        /// <summary>
+        /// Implement IDisposable pattern
+        /// </summary>
+        public void Dispose()
+        {
+            if (ProxiedClient is IDisposable diposable)
+                diposable.Dispose();
+            else
+                CloseCommunicationObject();
         }
     }
 }
