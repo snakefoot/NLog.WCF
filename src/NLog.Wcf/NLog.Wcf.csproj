@@ -4,7 +4,7 @@
     <TargetFrameworks>net35;net46;netstandard2.0</TargetFrameworks>
     <RootNamespace>NLog</RootNamespace>
 
-    <VersionPrefix>6.0.3</VersionPrefix>
+    <VersionPrefix>6.1.1</VersionPrefix>
     <VersionSuffix></VersionSuffix>
 
     <AssemblyVersion>6.0.0.0</AssemblyVersion>
@@ -23,8 +23,8 @@
     <PackageReleaseNotes>
 ChangeLog:
 
-- Addded support for https endpoints with BasicHttpSecurityMode.Transport
-- Updated to NLog v6.0.3
+- Updated to System.ServiceModel ver. 8.1.1 and fixed breaking changes
+- Updated to NLog v6.1.1
 
 Docs:
 https://github.com/NLog/NLog/wiki/LogReceiverService-target
@@ -63,7 +63,7 @@ https://github.com/NLog/NLog/wiki/LogReceiverService-target
 
   <ItemGroup>
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
-    <PackageReference Include="NLog" Version="6.0.3" />
+    <PackageReference Include="NLog" Version="6.1.1" />
   </ItemGroup>
 
   <ItemGroup Condition=" '$(TargetFrameworkIdentifier)' == '.NETFramework' ">
@@ -74,8 +74,8 @@ https://github.com/NLog/NLog/wiki/LogReceiverService-target
   </ItemGroup>
 
   <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard2.0' ">
-    <PackageReference Include="System.ServiceModel.Http" Version="8.1.0" />
-    <PackageReference Include="System.ServiceModel.NetTcp" Version="8.1.0" />
+    <PackageReference Include="System.ServiceModel.Http" Version="8.1.1" />
+    <PackageReference Include="System.ServiceModel.NetTcp" Version="8.1.1" />
   </ItemGroup>
 
   <PropertyGroup>
