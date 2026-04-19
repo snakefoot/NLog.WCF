@@ -48,7 +48,7 @@ namespace NLog.Targets
     /// <summary>
     /// Sends log messages to a NLog Receiver Service (using WCF or Web Services).
     /// </summary>
-    /// <seealso href="https://github.com/nlog/nlog/wiki/LogReceiverService-target">Documentation on NLog Wiki</seealso>
+    /// <seealso href="https://github.com/NLog/NLog/wiki/LogReceiverService-target">Documentation on NLog Wiki</seealso>
     [Target("LogReceiverService")]
     public class LogReceiverWebServiceTarget : Target
     {
